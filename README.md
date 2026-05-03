@@ -1,36 +1,103 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Kaarigar MVP
 
-## Getting Started
+Two-sided on-demand marketplace for skilled workers in Rawalpindi/Islamabad, Pakistan.
 
-First, run the development server:
+**Stack:** Next.js 14 (App Router) + Supabase (PostgreSQL + PostGIS) + Tailwind CSS + shadcn/ui
+
+## Quick Start
+
+### Prerequisites
+- Node.js 18+
+- Supabase account (free tier OK)
+- `.env` file with:
+  ```
+  NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+  NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+  ```
+
+### Setup
 
 ```bash
+# Install deps
+npm install
+
+# Run dev server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) — unauthenticated users see the landing page.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Troubleshooting
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Email Rate Limit Exceeded
+**Cause:** Too many signup attempts with the same email within ~1 hour (Supabase default).
+
+**Solutions:**
+1. **Use a different email** — e.g., `test2@example.com`, `test3@example.com`, etc.
+2. **Disable rate limiting for development:**
+   - Supabase Dashboard → Authentication → Providers → Email
+   - Set **"Rate limit per email"** to `0` (unlimited)
+3. **Wait 1 hour** for automatic reset
+4. **Incognito mode** — May bypass IP-based limits
+
+### Database Migrations Not Running
+```bash
+# Push migrations to Supabase
+supabase db push
+```
+
+### Realtime Not Working
+- Verify `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in `.env`
+- Check Supabase project → Realtime → Tables → Enable your tables
+
+## Project Structure
+
+```
+app/
+  page.tsx              ← Landing page (unauthenticated)
+  (buyer)/              ← Buyer routes (protected)
+  (provider)/           ← Provider routes (protected)
+  actions/              ← Server actions
+  messages/             ← In-app chat
+  
+components/
+  shared/               ← Nav, Realtime components
+  ui/                   ← shadcn/ui components
+  
+lib/
+  supabase/             ← Supabase helpers & types
+  
+supabase/
+  migrations/           ← SQL migrations (001-005)
+```
+
+## Key Features
+
+✅ Email/password auth with role selection (buyer/provider)
+✅ Job posting (multi-step form with geolocation)
+✅ Proximity-based job feed (PostGIS ST_DWithin)
+✅ Real-time bidding & notifications (Supabase Realtime)
+✅ In-app messaging
+✅ Review system & public provider profiles
+✅ Role-based dashboards with job history & earnings
+✅ Responsive design with mobile-first approach
+✅ Loading skeletons & error boundaries
+
+## Testing Checklist
+
+- [ ] Sign up as buyer (email/password)
+- [ ] Sign up as provider (email/password + skills setup)
+- [ ] Post a job (buyer)
+- [ ] Submit bid (provider)
+- [ ] Accept bid (buyer)
+- [ ] Start job → Mark complete (provider)
+- [ ] Submit review (buyer)
+- [ ] View public provider profile
+- [ ] Send/receive messages (both)
+- [ ] Check dashboard history
 
 ## Learn More
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [Next.js Docs](https://nextjs.org/docs)
+- [Supabase Docs](https://supabase.com/docs)
+- [shadcn/ui](https://ui.shadcn.com)
