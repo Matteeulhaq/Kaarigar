@@ -7,7 +7,7 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
   title: "Kaarigar — Skilled Workers Near You",
-  description: "On-demand marketplace connecting households with trusted nearby skilled workers.",
+  description: "On-demand marketplace connecting households with trusted nearby plumbers, electricians, AC technicians, and carpenters.",
 };
 
 export default function RootLayout({

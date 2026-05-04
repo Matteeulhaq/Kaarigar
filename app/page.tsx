@@ -115,6 +115,17 @@ export default async function Home() {
           </section>
         )}
 
+        {/* ── What We Offer ──────────────────────────────── */}
+        <section className="py-12 px-4 bg-white">
+          <div className="max-w-3xl mx-auto text-center">
+            <h2 className="text-2xl font-bold mb-4">What We Offer</h2>
+            <p className="text-muted-foreground leading-relaxed">
+              From plumbing and electrical work to AC servicing and carpentry — Kaarigar connects you to verified specialists near you.
+              Whatever the job, find skilled professionals ready to help.
+            </p>
+          </div>
+        </section>
+
         {/* ── Trust Signals ──────────────────────────────── */}
         <section className="py-16 px-4">
           <div className="max-w-4xl mx-auto">
