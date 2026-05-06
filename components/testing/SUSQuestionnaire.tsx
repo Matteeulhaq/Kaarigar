@@ -129,16 +129,16 @@ export function SUSQuestionnaire({ open, onClose, flowName }: SUSQuestionnairePr
           </div>
         ) : (
           <div className="text-center py-8">
-            <div className="text-4xl font-bold text-orange-600 mb-2">{score}</div>
+            <div className="text-4xl font-bold text-orange-600 mb-2">{score!}</div>
             <p className="text-muted-foreground mb-1">Your SUS Score</p>
             <p className="text-sm text-muted-foreground">
-              {score >= 80
+              {score! >= 80
                 ? 'Excellent!'
-                : score >= 70
+                : score! >= 70
                   ? 'Good'
-                  : score >= 60
+                  : score! >= 60
                     ? 'OK'
-                    : score >= 50
+                    : score! >= 50
                       ? 'Poor'
                       : 'Awful'}
             </p>
