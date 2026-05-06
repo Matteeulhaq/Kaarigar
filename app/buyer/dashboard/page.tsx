@@ -1,10 +1,11 @@
-import Link from 'next/link'
+import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import BuyerBidNotifier from '@/components/shared/buyer-bid-notifier'
+import DatabaseError from '@/components/error/database-error'
 import type { Job, Profile } from '@/lib/supabase/types'
 
 type JobWithExtras = Omit<Job, 'accepted_bid'> & {
@@ -29,6 +30,8 @@ export default async function BuyerDashboard() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
+  if (!user) redirect('/login')
+
   const { data: jobsRaw, error: jobsError } = await supabase
     .from('jobs')
     .select(`
@@ -36,27 +39,60 @@ export default async function BuyerDashboard() {
       category:categories(name, icon),
       bids!bids_job_id_fkey(id)
     `)
-    .eq('buyer_id', user!.id)
+    .eq('buyer_id', user.id)
     .order('created_at', { ascending: false })
 
-  if (jobsError) console.error('[buyer dashboard] jobs query error:', jobsError)
+  // Show error UI if database query fails
+  if (jobsError) {
+    return (
+      <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+        <DatabaseError
+          title="Could not load your jobs"
+          message={jobsError.message}
+        />
+      </div>
+    )
+  }
 
   // Fetch review counts per job for this buyer (to show "Reviewed" badge)
-  const { data: reviewedJobs } = await supabase
+  const { data: reviewedJobs, error: reviewsError } = await supabase
     .from('reviews')
     .select('job_id')
-    .eq('reviewer_id', user!.id)
+    .eq('reviewer_id', user.id)
+
+  if (reviewsError) {
+    return (
+      <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+        <DatabaseError
+          title="Could not load reviews"
+          message={reviewsError.message}
+        />
+      </div>
+    )
+  }
+
   const reviewedJobIds = new Set((reviewedJobs ?? []).map((r: { job_id: string }) => r.job_id))
 
   // Fetch accepted bids separately to get provider name + price (avoids FK hint issues)
   const jobIds = (jobsRaw ?? []).map((j: Record<string, unknown>) => j.id as string)
-  const { data: acceptedBidsRaw } = jobIds.length > 0
+  const { data: acceptedBidsRaw, error: bidsError } = jobIds.length > 0
     ? await supabase
         .from('bids')
         .select('job_id, price, provider:profiles!bids_provider_id_fkey(id, name)')
         .in('job_id', jobIds)
         .eq('status', 'accepted')
     : { data: [] }
+
+  if (bidsError) {
+    return (
+      <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+        <DatabaseError
+          title="Could not load bids"
+          message={bidsError.message}
+        />
+      </div>
+    )
+  }
 
   type AcceptedBidMap = Record<string, { price: number; provider: Pick<Profile, 'id' | 'name'> | null }>
   type RawAcceptedBid = { job_id: string; price: number; provider: { id: string; name: string }[] }

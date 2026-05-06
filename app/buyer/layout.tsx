@@ -9,15 +9,18 @@ export default async function BuyerLayout({ children }: { children: React.ReactN
 
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', user.id)
     .single()
 
-  if (!profile) redirect('/login')
+  // If profile query fails, redirect to login
+  if (profileError || !profile) {
+    redirect('/login')
+  }
 
-  // Role checking is handled by middleware - trust that user has correct role here
+  // Profile exists, safe to pass to Nav
   return (
     <div className="min-h-screen flex flex-col">
       <Nav profile={profile as Profile} />

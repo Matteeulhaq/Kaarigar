@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import BidNotifier from '@/components/shared/bid-notifier'
 import { Separator } from '@/components/ui/separator'
+import DatabaseError from '@/components/error/database-error'
 import type { Job } from '@/lib/supabase/types'
 
 const URGENCY_COLORS: Record<string, string> = {
@@ -29,11 +30,23 @@ export default async function ProviderDashboard() {
   if (!user) redirect('/login')
 
   // Check if the provider has set up their profile yet
-  const { data: providerProfile } = await supabase
+  const { data: providerProfile, error: profileError } = await supabase
     .from('provider_profiles')
     .select('id, lat, lng, service_radius_km')
     .eq('user_id', user.id)
     .single()
+
+  // Show error if profile fetch fails
+  if (profileError) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
+        <DatabaseError
+          title="Could not load your profile"
+          message={profileError.message}
+        />
+      </div>
+    )
+  }
 
   if (!providerProfile) {
     // First time — nudge them to set up profile
@@ -53,34 +66,62 @@ export default async function ProviderDashboard() {
 
   // Fetch nearby open jobs using provider lat/lng and radius
   let jobs: Job[] = []
+  let jobsError: Error | null = null
+
   if (providerProfile.lat && providerProfile.lng) {
     const radiusMeters = (providerProfile.service_radius_km ?? 10) * 1000
-    const { data } = await supabase.rpc('get_nearby_jobs', {
+    const { data, error: rpcError } = await supabase.rpc('get_nearby_jobs', {
       provider_lat: providerProfile.lat,
       provider_lng: providerProfile.lng,
       radius_m: radiusMeters,
     })
     jobs = data ?? []
+    jobsError = rpcError
   } else {
     // Fallback: just show all open jobs if location not set
-    const { data } = await supabase
+    const { data, error: jobsQueryError } = await supabase
       .from('jobs')
       .select('*, category:categories(name, icon)')
       .eq('status', 'open')
       .order('created_at', { ascending: false })
       .limit(20)
     jobs = data ?? []
+    jobsError = jobsQueryError
+  }
+
+  // Show error if jobs fetch fails
+  if (jobsError) {
+    return (
+      <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+        <DatabaseError
+          title="Could not load jobs"
+          message={jobsError.message}
+        />
+      </div>
+    )
   }
 
   // Also get jobs provider has already bid on
-  const { data: myBids } = await supabase
+  const { data: myBids, error: bidsError } = await supabase
     .from('bids')
     .select('job_id')
     .eq('provider_id', user.id)
+
+  if (bidsError) {
+    return (
+      <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+        <DatabaseError
+          title="Could not load your bids"
+          message={bidsError.message}
+        />
+      </div>
+    )
+  }
+
   const bidJobIds = new Set((myBids ?? []).map((b: { job_id: string }) => b.job_id))
 
   // Fetch completed jobs where this provider was the accepted provider
-  const { data: completedBids } = await supabase
+  const { data: completedBids, error: completedError } = await supabase
     .from('bids')
     .select(`
       price,
@@ -93,6 +134,17 @@ export default async function ProviderDashboard() {
     .eq('status', 'accepted')
     .order('created_at', { ascending: false })
     .limit(20)
+
+  if (completedError) {
+    return (
+      <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+        <DatabaseError
+          title="Could not load completed jobs"
+          message={completedError.message}
+        />
+      </div>
+    )
+  }
 
   type AcceptedBid = {
     price: number
