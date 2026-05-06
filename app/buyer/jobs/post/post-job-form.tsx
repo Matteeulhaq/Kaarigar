@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
@@ -10,6 +10,16 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent } from '@/components/ui/card'
 import type { Urgency } from '@/lib/supabase/types'
+import { useTestSession, startTestFlow, completeTestFlow } from '@/lib/hooks/useTestSession'
+import {
+  trackJobCategorySelected,
+  trackJobDetailsEntered,
+  trackJobLocationSet,
+  trackJobPosted,
+  trackStepComplete,
+  trackStepError,
+} from '@/lib/tracking'
+import { SUSQuestionnaire } from '@/components/testing/SUSQuestionnaire'
 
 // ─── Types ───────────────────────────────────────────────────
 interface Category {
@@ -59,6 +69,8 @@ function StepCategory({
   onSelect: (id: string, name: string) => void
   onNext: () => void
 }) {
+  const { isTestMode } = useTestSession()
+
   return (
     <div className="space-y-4">
       <div>
@@ -70,7 +82,10 @@ function StepCategory({
           <button
             key={cat.id}
             type="button"
-            onClick={() => onSelect(cat.id, cat.name)}
+            onClick={() => {
+              onSelect(cat.id, cat.name)
+              if (isTestMode) trackJobCategorySelected(cat.id, cat.name)
+            }}
             className={`rounded-xl border-2 p-3 text-left transition-colors ${
               selected === cat.id
                 ? 'border-orange-500 bg-orange-50'
@@ -116,7 +131,19 @@ function StepDetails({
   onNext: () => void
   onBack: () => void
 }) {
+  const { isTestMode } = useTestSession()
   const valid = form.title.trim().length >= 5
+
+  const handleNext = () => {
+    if (isTestMode) {
+      trackJobDetailsEntered({
+        title: form.title,
+        hasDescription: form.description.trim().length > 0,
+        urgency: form.urgency,
+      })
+    }
+    onNext()
+  }
 
   return (
     <div className="space-y-5">
@@ -180,7 +207,7 @@ function StepDetails({
         <Button
           className="bg-orange-600 hover:bg-orange-700"
           disabled={!valid}
-          onClick={onNext}
+          onClick={handleNext}
         >
           Next →
         </Button>
@@ -202,6 +229,7 @@ function StepLocation({
   onBack: () => void
 }) {
   const [detecting, setDetecting] = useState(false)
+  const { isTestMode } = useTestSession()
 
   const detect = useCallback(() => {
     if (!navigator.geolocation) {
@@ -239,6 +267,16 @@ function StepLocation({
   }, [onChange])
 
   const valid = form.lat !== null && form.lng !== null
+
+  const handleNext = () => {
+    if (isTestMode) {
+      trackJobLocationSet(
+        form.lat !== null && form.lng !== null,
+        form.address.trim().length > 0
+      )
+    }
+    onNext()
+  }
 
   return (
     <div className="space-y-5">
@@ -311,7 +349,7 @@ function StepLocation({
         <Button
           className="bg-orange-600 hover:bg-orange-700"
           disabled={!valid}
-          onClick={onNext}
+          onClick={handleNext}
         >
           Next →
         </Button>
@@ -442,9 +480,23 @@ interface PostJobPageProps {
 function PostJobForm({ categories }: PostJobPageProps) {
   const router = useRouter()
   const supabase = createClient()
+  const { isTestMode } = useTestSession()
 
   const [step, setStep] = useState(0)
   const [submitting, setSubmitting] = useState(false)
+  const [showSUS, setShowSUS] = useState(false)
+
+  // Step timing for test tracking
+  const stepStartTimeRef = useRef<number>(Date.now())
+  const flowStartTimeRef = useRef<number>(Date.now())
+
+  useEffect(() => {
+    stepStartTimeRef.current = Date.now()
+    if (step === 0 && isTestMode) {
+      startTestFlow('post-job')
+      flowStartTimeRef.current = Date.now()
+    }
+  }, [step, isTestMode])
 
   const [form, setForm] = useState<FormState>({
     categoryId: '',
@@ -460,6 +512,20 @@ function PostJobForm({ categories }: PostJobPageProps) {
 
   function update(key: keyof FormState, value: unknown) {
     setForm((prev) => ({ ...prev, [key]: value }))
+  }
+
+  function handleStepChange(newStep: number) {
+    if (isTestMode) {
+      const duration = Date.now() - stepStartTimeRef.current
+      const stepNames = ['category', 'details', 'location', 'photos']
+      trackStepComplete({
+        step,
+        stepName: stepNames[step],
+        durationMs: duration,
+        flow: 'post-job',
+      })
+    }
+    setStep(newStep)
   }
 
   async function uploadPhotos(jobId: string): Promise<string[]> {
@@ -482,16 +548,40 @@ function PostJobForm({ categories }: PostJobPageProps) {
     // Validate all required fields
     if (!form.categoryId) {
       toast.error('Please select a category')
+      if (isTestMode) {
+        trackStepError({
+          step: 3,
+          stepName: 'photos',
+          errorMessage: 'Category not selected',
+          flow: 'post-job',
+        })
+      }
       setSubmitting(false)
       return
     }
     if (!form.title.trim()) {
       toast.error('Please enter a job title')
+      if (isTestMode) {
+        trackStepError({
+          step: 3,
+          stepName: 'photos',
+          errorMessage: 'Title not entered',
+          flow: 'post-job',
+        })
+      }
       setSubmitting(false)
       return
     }
     if (form.lat === null || form.lng === null) {
       toast.error('Please set your job location')
+      if (isTestMode) {
+        trackStepError({
+          step: 3,
+          stepName: 'photos',
+          errorMessage: 'Location not set',
+          flow: 'post-job',
+        })
+      }
       setSubmitting(false)
       return
     }
@@ -523,6 +613,14 @@ function PostJobForm({ categories }: PostJobPageProps) {
     if (error || !job) {
       console.error('Job insert error:', error)
       toast.error(error?.message || 'Failed to post job. Please try again.')
+      if (isTestMode) {
+        trackStepError({
+          step: 3,
+          stepName: 'photos',
+          errorMessage: error?.message || 'Failed to post job',
+          flow: 'post-job',
+        })
+      }
       setSubmitting(false)
       return
     }
@@ -536,6 +634,13 @@ function PostJobForm({ categories }: PostJobPageProps) {
           .update({ photo_urls: photoUrls })
           .eq('id', job.id)
       }
+    }
+
+    if (isTestMode) {
+      trackJobPosted(form.photos.length)
+      const totalDuration = Date.now() - flowStartTimeRef.current
+      completeTestFlow('post-job', totalDuration)
+      setShowSUS(true)
     }
 
     toast.success('Job posted! Nearby providers will be notified.')
@@ -562,34 +667,40 @@ function PostJobForm({ categories }: PostJobPageProps) {
             update('categoryId', id)
             update('categoryName', name)
           }}
-          onNext={() => setStep(1)}
+          onNext={() => handleStepChange(1)}
         />
       )}
       {step === 1 && (
         <StepDetails
           form={form}
           onChange={(key, value) => update(key, value)}
-          onNext={() => setStep(2)}
-          onBack={() => setStep(0)}
+          onNext={() => handleStepChange(2)}
+          onBack={() => handleStepChange(0)}
         />
       )}
       {step === 2 && (
         <StepLocation
           form={form}
           onChange={(key, value) => update(key, value)}
-          onNext={() => setStep(3)}
-          onBack={() => setStep(1)}
+          onNext={() => handleStepChange(3)}
+          onBack={() => handleStepChange(1)}
         />
       )}
       {step === 3 && (
         <StepPhotos
           form={form}
           onPhotosChange={(files) => update('photos', files)}
-          onBack={() => setStep(2)}
+          onBack={() => handleStepChange(2)}
           onSubmit={handleSubmit}
           submitting={submitting}
         />
       )}
+
+      <SUSQuestionnaire
+        open={showSUS}
+        onClose={() => setShowSUS(false)}
+        flowName="post-job"
+      />
     </div>
   )
 }

@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { cookies } from 'next/headers'
 
 export async function acceptBid(
   bidId: string,
@@ -28,7 +29,7 @@ export async function acceptBid(
   // Verify bid belongs to this job
   const { data: bid, error: bidErr } = await supabase
     .from('bids')
-    .select('id, status')
+    .select('id, status, price')
     .eq('id', bidId)
     .eq('job_id', jobId)
     .single()
@@ -43,6 +44,21 @@ export async function acceptBid(
   })
 
   if (rpcErr) return { error: rpcErr.message }
+
+  // Track bid acceptance if in test mode
+  const cookieStore = await cookies()
+  const testerId = cookieStore.get('test_tester_id')?.value
+  if (testerId) {
+    // We'll use a client-side event for tracking since this is a server action
+    // Set a cookie to trigger client-side tracking
+    cookieStore.set('test_track_action', JSON.stringify({
+      action: 'accept_bid',
+      bidId,
+      jobId,
+      price: bid.price,
+      timestamp: Date.now(),
+    }), { maxAge: 60 })
+  }
 
   revalidatePath(`/buyer/jobs/${jobId}`)
   return {}

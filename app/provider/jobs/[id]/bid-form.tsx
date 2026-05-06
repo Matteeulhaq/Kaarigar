@@ -13,6 +13,9 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { Bid } from '@/lib/supabase/types'
+import { useTestSession, startTestFlow, completeTestFlow } from '@/lib/hooks/useTestSession'
+import { trackBidSubmitted, trackBidError } from '@/lib/tracking'
+import { SUSQuestionnaire } from '@/components/testing/SUSQuestionnaire'
 
 const schema = z.object({
   price: z
@@ -46,7 +49,9 @@ interface BidFormProps {
 export default function BidForm({ jobId, existingBid, jobStatus }: BidFormProps) {
   const router = useRouter()
   const supabase = createClient()
+  const { isTestMode } = useTestSession()
   const [loading, setLoading] = useState(false)
+  const [showSUS, setShowSUS] = useState(false)
 
   const {
     register,
@@ -137,6 +142,10 @@ export default function BidForm({ jobId, existingBid, jobStatus }: BidFormProps)
   async function onSubmit(values: FormValues) {
     setLoading(true)
 
+    if (isTestMode) {
+      startTestFlow('submit-bid')
+    }
+
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       toast.error('You must be logged in')
@@ -156,11 +165,23 @@ export default function BidForm({ jobId, existingBid, jobStatus }: BidFormProps)
       // Unique constraint violation = already bid
       if (error.code === '23505') {
         toast.error('You have already submitted a bid for this job.')
+        if (isTestMode) trackBidError('Already bid on this job')
       } else {
         toast.error(error.message)
+        if (isTestMode) trackBidError(error.message)
       }
       setLoading(false)
       return
+    }
+
+    if (isTestMode) {
+      trackBidSubmitted({
+        price: values.price,
+        etaMinutes: values.eta_minutes,
+        hasMessage: (values.message?.trim().length ?? 0) > 0,
+      })
+      completeTestFlow('submit-bid', 0)
+      setShowSUS(true)
     }
 
     toast.success('Bid submitted! The buyer will be notified.')
@@ -253,6 +274,12 @@ export default function BidForm({ jobId, existingBid, jobStatus }: BidFormProps)
           </Button>
         </form>
       </CardContent>
+
+      <SUSQuestionnaire
+        open={showSUS}
+        onClose={() => setShowSUS(false)}
+        flowName="submit-bid"
+      />
     </Card>
   )
 }

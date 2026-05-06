@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { cookies } from 'next/headers'
 
 // ─── Start Job (provider: accepted → in_progress) ───────────────────────────
 export async function startJob(jobId: string): Promise<{ error?: string }> {
@@ -33,6 +34,17 @@ export async function startJob(jobId: string): Promise<{ error?: string }> {
     .eq('id', jobId)
 
   if (error) return { error: error.message }
+
+  // Track job start if in test mode
+  const cookieStore = await cookies()
+  const testerId = cookieStore.get('test_tester_id')?.value
+  if (testerId) {
+    cookieStore.set('test_track_action', JSON.stringify({
+      action: 'start_job',
+      jobId,
+      timestamp: Date.now(),
+    }), { maxAge: 60 })
+  }
 
   revalidatePath(`/provider/jobs/${jobId}`)
   revalidatePath(`/buyer/jobs/${jobId}`)
@@ -68,6 +80,17 @@ export async function completeJob(jobId: string): Promise<{ error?: string }> {
     .eq('id', jobId)
 
   if (error) return { error: error.message }
+
+  // Track job completion if in test mode
+  const cookieStore = await cookies()
+  const testerId = cookieStore.get('test_tester_id')?.value
+  if (testerId) {
+    cookieStore.set('test_track_action', JSON.stringify({
+      action: 'complete_job',
+      jobId,
+      timestamp: Date.now(),
+    }), { maxAge: 60 })
+  }
 
   revalidatePath(`/provider/jobs/${jobId}`)
   revalidatePath(`/buyer/jobs/${jobId}`)
