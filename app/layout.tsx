@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { Suspense } from "react";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { PHProvider } from "@/lib/posthog-provider";
@@ -22,9 +23,11 @@ export default function RootLayout({
     <html lang="en" className={`h-full antialiased ${inter.variable} font-sans`}>
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <PHProvider>
-          <TestModeIndicator />
+          <Suspense fallback={null}>
+            <TestModeIndicator />
+            <ResearcherNotes />
+          </Suspense>
           {children}
-          <ResearcherNotes />
           <Toaster richColors position="top-right" />
         </PHProvider>
       </body>
