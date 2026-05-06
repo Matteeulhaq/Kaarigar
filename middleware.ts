@@ -59,6 +59,9 @@ export async function middleware(request: NextRequest) {
 
     const role = profile?.role
 
+    // Don't redirect if role is not found — let the page handle it
+    if (!role) return supabaseResponse
+
     const isBuyerRoute = BUYER_ROUTES.some((r) => pathname.startsWith(r))
     const isProviderRoute = PROVIDER_ROUTES.some((r) => pathname.startsWith(r))
 
@@ -78,6 +81,7 @@ export async function middleware(request: NextRequest) {
       .eq('id', user.id)
       .single()
 
+    // Default to buyer dashboard if role is not found yet
     const destination =
       profile?.role === 'provider' ? '/provider/dashboard' : '/buyer/dashboard'
     return NextResponse.redirect(new URL(destination, request.url))
