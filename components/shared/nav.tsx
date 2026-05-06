@@ -57,7 +57,14 @@ export default function Nav({ profile }: NavProps) {
           ))}
           <Link href={profileHref}>
             <Avatar className="h-8 w-8 cursor-pointer ring-2 ring-transparent hover:ring-orange-300 transition-all">
-              <AvatarImage src={profile.avatar_url ?? undefined} />
+              <AvatarImage
+                src={profile.avatar_url ?? undefined}
+                onLoadingStatusChange={(status) => {
+                  if (status === 'error') {
+                    // Fallback will show automatically
+                  }
+                }}
+              />
               <AvatarFallback className="text-xs bg-orange-100 text-orange-700">
                 {initials}
               </AvatarFallback>
@@ -76,7 +83,14 @@ export default function Nav({ profile }: NavProps) {
         <div className="flex sm:hidden items-center gap-2">
           <Link href={profileHref}>
             <Avatar className="h-8 w-8">
-              <AvatarImage src={profile.avatar_url ?? undefined} />
+              <AvatarImage
+                src={profile.avatar_url ?? undefined}
+                onLoadingStatusChange={(status) => {
+                  if (status === 'error') {
+                    // Fallback will show automatically
+                  }
+                }}
+              />
               <AvatarFallback className="text-xs bg-orange-100 text-orange-700">
                 {initials}
               </AvatarFallback>

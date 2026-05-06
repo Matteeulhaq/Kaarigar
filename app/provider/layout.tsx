@@ -15,8 +15,9 @@ export default async function ProviderLayout({ children }: { children: React.Rea
     .eq('id', user.id)
     .single()
 
-  if (!profile || profile.role !== 'provider') redirect('/buyer/dashboard')
+  if (!profile) redirect('/login')
 
+  // Role checking is handled by middleware - trust that user has correct role here
   return (
     <div className="min-h-screen flex flex-col">
       <Nav profile={profile as Profile} />

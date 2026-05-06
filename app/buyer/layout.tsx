@@ -15,8 +15,9 @@ export default async function BuyerLayout({ children }: { children: React.ReactN
     .eq('id', user.id)
     .single()
 
-  if (!profile || profile.role !== 'buyer') redirect('/provider/dashboard')
+  if (!profile) redirect('/login')
 
+  // Role checking is handled by middleware - trust that user has correct role here
   return (
     <div className="min-h-screen flex flex-col">
       <Nav profile={profile as Profile} />

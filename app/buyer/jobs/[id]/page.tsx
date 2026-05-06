@@ -91,12 +91,13 @@ export default async function BuyerJobDetailPage({
   // Signed URLs for photos
   const signedPhotoUrls: string[] = []
   if (job.photo_urls?.length > 0) {
+    // Filter out empty or invalid URLs before creating signed URLs
+    const validUrls = job.photo_urls.filter((p) => p && p.trim() !== '')
+    const paths = validUrls.map((p) => (p.startsWith('http') ? p.split('/job-photos/')[1] : p))
+
     const { data: signed } = await supabase.storage
       .from('job-photos')
-      .createSignedUrls(
-        job.photo_urls.map((p) => (p.startsWith('http') ? p.split('/job-photos/')[1] : p)),
-        60 * 60
-      )
+      .createSignedUrls(paths, 60 * 60)
     if (signed) signedPhotoUrls.push(...signed.map((s) => s.signedUrl))
   }
 
@@ -196,6 +197,11 @@ export default async function BuyerJobDetailPage({
                 src={url}
                 alt={`Job photo ${i + 1}`}
                 className="rounded-lg object-cover aspect-square w-full"
+                onError={(e) => {
+                  // Hide image on error to prevent 404 in console
+                  const target = e.currentTarget
+                  target.style.display = 'none'
+                }}
               />
             ))}
           </div>

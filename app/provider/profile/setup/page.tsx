@@ -289,6 +289,10 @@ export default function ProviderProfileSetup() {
                       src={url}
                       alt={`Portfolio ${i + 1}`}
                       className="h-20 w-20 object-cover rounded-md border"
+                      onError={(e) => {
+                        // Remove from state if image fails to load
+                        setPortfolioUrls((prev) => prev.filter((_, idx) => idx !== i))
+                      }}
                     />
                     <button
                       type="button"

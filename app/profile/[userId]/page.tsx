@@ -45,14 +45,13 @@ export default async function PublicProfilePage({
   // Portfolio signed URLs
   const portfolioUrls: string[] = []
   if (providerProfile.portfolio_urls?.length) {
+    // Filter out empty or invalid URLs before creating signed URLs
+    const validUrls = providerProfile.portfolio_urls.filter((u) => u && u.trim() !== '')
+    const paths = validUrls.map((u) => (u.startsWith('http') ? u.split('/portfolio/')[1] : u))
+
     const { data: signed } = await supabase.storage
       .from('portfolio')
-      .createSignedUrls(
-        providerProfile.portfolio_urls.map((u) =>
-          u.startsWith('http') ? u.split('/portfolio/')[1] : u
-        ),
-        60 * 60
-      )
+      .createSignedUrls(paths, 60 * 60)
     if (signed) portfolioUrls.push(...signed.map((s) => s.signedUrl))
   }
 
@@ -154,6 +153,11 @@ export default async function PublicProfilePage({
                 src={url}
                 alt={`Portfolio item ${i + 1}`}
                 className="rounded-lg object-cover aspect-square w-full"
+                onError={(e) => {
+                  // Hide image on error to prevent 404 in console
+                  const target = e.currentTarget
+                  target.style.display = 'none'
+                }}
               />
             ))}
           </div>
